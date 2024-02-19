@@ -57,6 +57,7 @@ use super::{
 };
 
 use super::dag_algo::is_directed_acyclic_graph;
+use rustworkx_core::graph_ext::*;
 
 /// A class for creating directed graphs
 ///

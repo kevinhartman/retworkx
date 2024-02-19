@@ -62,6 +62,8 @@
 //! <https://www.rustworkx.org/release_notes.html>
 
 use std::convert::Infallible;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 
 /// A convenient type alias that by default assumes no error can happen.
 ///
@@ -87,6 +89,7 @@ pub mod traversal;
 // These modules define additional data structures
 pub mod dictmap;
 pub mod distancemap;
+pub mod graph_ext;
 mod min_scored;
 /// Module for swapping tokens
 pub mod token_swapper;
@@ -95,3 +98,30 @@ pub mod utils;
 // re-export petgraph so there is a consistent version available to users and
 // then only need to require rustworkx-core in their dependencies
 pub use petgraph;
+
+#[derive(Debug)]
+pub enum RxError<E> {
+    InvalidArgument(String),
+    FailedCallback {
+        error: E,
+    }
+}
+
+impl<E: Display> Display for RxError<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            // Both underlying errors already impl `Display`, so we defer to
+            // their implementations.
+            RxError::InvalidArgument(ref reason) => write!(f, "Invalid argument: {}", reason),
+            RxError::FailedCallback { ref error } => write!(f, "User callback failed: {}", error),
+        }
+    }
+}
+
+impl<E: Debug + Display> Error for RxError<E> {}
+
+impl<E> From<E> for RxError<E> {
+    fn from(err: E) -> RxError<E> {
+        RxError::FailedCallback { error: err }
+    }
+}
