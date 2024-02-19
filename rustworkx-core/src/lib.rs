@@ -102,9 +102,7 @@ pub use petgraph;
 #[derive(Debug)]
 pub enum RxError<E> {
     InvalidArgument(String),
-    FailedCallback {
-        error: E,
-    }
+    FailedCallback { error: E },
 }
 
 impl<E: Display> Display for RxError<E> {

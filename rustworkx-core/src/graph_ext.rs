@@ -13,8 +13,8 @@
 //! This module defines traits that extend PetGraph's graph
 //! data structures with helpful instance methods.
 
-use std::error::Error;
 use crate::utils::merge_duplicates;
+use crate::RxError;
 use indexmap::IndexSet;
 use petgraph::data::Build;
 use petgraph::graph::IndexType;
@@ -23,9 +23,9 @@ use petgraph::visit::{
     Data, Dfs, EdgeRef, GraphBase, IntoEdges, IntoEdgesDirected, IntoNeighbors, Visitable,
 };
 use petgraph::{Direction, EdgeType};
+use std::error::Error;
 use std::hash::Hash;
 use std::ops::Deref;
-use crate::RxError;
 
 pub trait NodeRemovable: Data {
     fn remove_node(&mut self, node: Self::NodeId) -> Option<Self::NodeWeight>;
@@ -134,7 +134,9 @@ where
             IndexSet::from_iter(nodes);
 
         if check_cycle && !can_contract(&indices_to_remove) {
-            return Err(RxError::InvalidArgument(format!("contraction would create cycle(s)")));
+            return Err(RxError::InvalidArgument(format!(
+                "contraction would create cycle(s)"
+            )));
         }
 
         // Create new node.
