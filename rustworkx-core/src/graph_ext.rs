@@ -51,7 +51,7 @@ pub trait ContractNodes: Data + UserErrorType {
         nodes: I,
         weight: Self::NodeWeight,
         check_cycle: bool,
-        weight_combo_fn: F,
+        weight_combo_fn: Option<F>,
     ) -> Result<Self::NodeId, RxError<Self::UserError>>
     where
         I: IntoIterator<Item = Self::NodeId>,
@@ -97,7 +97,7 @@ where
         nodes: I,
         obj: Self::NodeWeight,
         check_cycle: bool,
-        mut weight_combo_fn: F,
+        weight_combo_fn: Option<F>,
     ) -> Result<Self::NodeId, RxError<Self::UserError>>
     where
         I: IntoIterator<Item = Self::NodeId>,
@@ -176,12 +176,12 @@ where
         }
 
         // If `weight_combo_fn` was specified, merge edges according
-        // to that function, even if this is a multigraph. If unspecified,
-        // defer parallel edge handling to `add_edge_no_cycle_check`.
-        // if let Some(merge_fn) = weight_combo_fn {
-            incoming_edges = merge_duplicates(incoming_edges, &mut weight_combo_fn)?;
-            outgoing_edges = merge_duplicates(outgoing_edges, &mut weight_combo_fn)?;
-        // }
+        // to that function. If unspecified, defer parallel edge handling
+        // to `add_edge`.
+        if let Some(mut merge_fn) = weight_combo_fn {
+            incoming_edges = merge_duplicates(incoming_edges, &mut merge_fn)?;
+            outgoing_edges = merge_duplicates(outgoing_edges, &mut merge_fn)?;
+        }
 
         for (source, weight) in incoming_edges.into_iter() {
             self.add_edge(source, node_index, weight);
