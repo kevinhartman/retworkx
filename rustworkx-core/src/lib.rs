@@ -65,6 +65,11 @@ use std::convert::Infallible;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
+use petgraph::graph::IndexType;
+use petgraph::stable_graph::StableGraph;
+use petgraph::visit::Data;
+use petgraph::{EdgeType, Graph};
+
 /// A convenient type alias that by default assumes no error can happen.
 ///
 /// It can be used to avoid type annotations when the function you want
@@ -98,20 +103,21 @@ pub mod utils;
 // re-export petgraph so there is a consistent version available to users and
 // then only need to require rustworkx-core in their dependencies
 pub use petgraph;
+use petgraph::graphmap::{GraphMap, NodeTrait};
+use petgraph::matrix_graph::{MatrixGraph, Nullable};
 
+/// The error type returned by Rustworkx core.
 #[derive(Debug)]
 pub enum RxError<E> {
     InvalidArgument(String),
-    FailedCallback { error: E },
+    CallbackFailure { error: E },
 }
 
 impl<E: Display> Display for RxError<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
-            // Both underlying errors already impl `Display`, so we defer to
-            // their implementations.
             RxError::InvalidArgument(ref reason) => write!(f, "Invalid argument: {}", reason),
-            RxError::FailedCallback { ref error } => write!(f, "User callback failed: {}", error),
+            RxError::CallbackFailure { ref error } => write!(f, "Callback error: {}", error),
         }
     }
 }
@@ -120,6 +126,55 @@ impl<E: Debug + Display> Error for RxError<E> {}
 
 impl<E> From<E> for RxError<E> {
     fn from(err: E) -> RxError<E> {
-        RxError::FailedCallback { error: err }
+        RxError::CallbackFailure { error: err }
+    }
+}
+
+/// A graph whose nodes may be removed.
+pub trait NodeRemovable: Data {
+    type ReturnType;
+    fn remove_node(&mut self, node: Self::NodeId) -> Self::ReturnType;
+}
+
+impl<N, E, Ty, Ix> NodeRemovable for StableGraph<N, E, Ty, Ix>
+where
+    Ty: EdgeType,
+    Ix: IndexType,
+{
+    type ReturnType = Option<Self::NodeWeight>;
+    fn remove_node(&mut self, node: Self::NodeId) -> Option<Self::NodeWeight> {
+        self.remove_node(node)
+    }
+}
+
+impl<N, E, Ty, Ix> NodeRemovable for Graph<N, E, Ty, Ix>
+where
+    Ty: EdgeType,
+    Ix: IndexType,
+{
+    type ReturnType = Option<Self::NodeWeight>;
+    fn remove_node(&mut self, node: Self::NodeId) -> Option<Self::NodeWeight> {
+        self.remove_node(node)
+    }
+}
+
+impl<N, E, Ty> NodeRemovable for GraphMap<N, E, Ty>
+where
+    N: NodeTrait,
+    Ty: EdgeType,
+{
+    type ReturnType = bool;
+    fn remove_node(&mut self, node: Self::NodeId) -> Self::ReturnType {
+        self.remove_node(node)
+    }
+}
+
+impl<N, E, Ty: EdgeType, Null: Nullable<Wrapped = E>, Ix: IndexType> NodeRemovable
+    for MatrixGraph<N, E, Ty, Null, Ix>
+{
+    type ReturnType = Self::NodeWeight;
+
+    fn remove_node(&mut self, node: Self::NodeId) -> Self::ReturnType {
+        self.remove_node(node)
     }
 }
