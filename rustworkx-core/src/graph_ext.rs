@@ -28,31 +28,26 @@ use std::ops::Deref;
 pub trait ContractNodesDirected: Data {
     /// Substitute a set of nodes with a single new node.
     ///
-    /// :param list nodes: A set of nodes to be removed and replaced
-    ///     by the new node. Any nodes not in the graph are ignored.
-    ///     If empty, this method behaves like :meth:`~PyDiGraph.add_node`
-    ///     (but slower).
-    /// :param object obj: The data/weight to associate with the new node.
-    /// :param bool check_cycle: If set to ``True``, validates
-    ///     that the contraction will not introduce cycles before
-    ///     modifying the graph. If set to ``False``, validation is
-    ///     skipped. If not provided, inherits the value
-    ///     of ``check_cycle`` from this instance of
-    ///     :class:`~rustworkx.PyDiGraph`.
-    /// :param weight_combo_fn: An optional python callable that, when
-    ///     specified, is used to merge parallel edges introduced by the
-    ///     contraction, which will occur when multiple nodes in
-    ///     ``nodes`` have an incoming edge
-    ///     from the same source node or when multiple nodes in
-    ///     ``nodes`` have an outgoing edge to the same target node.
-    ///     If this instance of :class:`~rustworkx.PyDiGraph` is a multigraph,
-    ///     leave this unspecified to preserve parallel edges. If unspecified
-    ///     when not a multigraph, parallel edges and their weights will be
-    ///     combined by choosing one of the edge's weights arbitrarily based
-    ///     on an internal iteration order, subject to change.
-    /// :returns: The index of the newly created node.
-    /// :raises DAGWouldCycle: The cycle check is enabled and the
-    ///     contraction would introduce cycle(s).
+    /// The specified `nodes` are removed and replaced with a new node
+    /// with the given `weight`. Any nodes not in the graph are ignored.
+    /// It is valid for `nodes` to be empty, in which case the new node
+    /// is added to the graph without edges.
+    ///
+    /// By default, contraction will *attempt* to introduce parallel edges
+    /// when more than one edge exists between the same node external to
+    /// `nodes` and more than one node inside of it.
+    /// If this is not desired (e.g. the graph is not a multi-graph),
+    /// specify `weight_combo_fn` to merge the would-be parallel edges.
+    ///
+    /// If `check_cycle` is enabled and the contraction would introduce
+    /// a cycle, an error is returned and the graph is not modified.
+    ///
+    /// The `NodeId` of the newly created node is returned.
+    ///
+    /// # Example
+    /// ```
+    /// todo!()
+    /// ```
     fn contract_nodes<I, F, E>(
         &mut self,
         nodes: I,
@@ -181,26 +176,23 @@ where
 pub trait ContractNodesUndirected: Data {
     /// Substitute a set of nodes with a single new node.
     ///
-    /// .. note::
-    ///     This method does not preserve the ordering of endpoints in
-    ///     edge tuple representations (e.g. the tuples returned from
-    ///     :meth:`~rustworkx.PyGraph.edge_list`).
+    /// The specified `nodes` are removed and replaced with a new node
+    /// with the given `weight`. Any nodes not in the graph are ignored.
+    /// It is valid for `nodes` to be empty, in which case the new node
+    /// is added to the graph without edges.
     ///
-    /// :param list nodes: A set of nodes to be removed and replaced
-    ///     by the new node. Any nodes not in the graph are ignored.
-    ///     If empty, this method behaves like :meth:`~PyGraph.add_node`
-    ///     (but slower).
-    /// :param object obj: The data/weight to associate with the new node.
-    /// :param weight_combo_fn: An optional python callable that, when
-    ///     specified, is used to merge parallel edges introduced by the
-    ///     contraction, which will occur if any two edges between ``nodes``
-    ///     and the rest of the graph share an endpoint.
-    ///     If this instance of :class:`~rustworkx.PyGraph` is a multigraph,
-    ///     leave this unspecified to preserve parallel edges. If unspecified
-    ///     when not a multigraph, parallel edges and their weights will be
-    ///     combined by choosing one of the edge's weights arbitrarily based
-    ///     on an internal iteration order, subject to change.
-    /// :returns: The index of the newly created node.
+    /// By default, contraction will *attempt* to introduce parallel edges
+    /// when more than one edge exists between the same node external to
+    /// `nodes` and more than one node inside of it.
+    /// If this is not desired (e.g. the graph is not a multi-graph),
+    /// specify `weight_combo_fn` to merge the would-be parallel edges.
+    ///
+    /// The `NodeId` of the newly created node is returned.
+    ///
+    /// # Example
+    /// ```
+    /// todo!()
+    /// ```
     fn contract_nodes<I, F, E>(
         &mut self,
         nodes: I,
