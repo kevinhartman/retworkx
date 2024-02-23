@@ -89,15 +89,24 @@ use std::convert::TryFrom;
 use rustworkx_core::dictmap::*;
 use rustworkx_core::RxError;
 
-/// A Rustworkx error type constructable from [PyErr] and
-/// the core error type, [RxErr].
+/// An ergonomic error type used to map Rustworkx's core [RxErr] to
+/// [PyErr] automatically, via [From::from].
 ///
-/// This struct is just a wrapper around a `[PyErr]`, which is
-/// useful to coerce an `[RxErr]` from Rustworkx core into an
-/// error type returnable via PyO3. It supports conversion back
-/// to a [PyErr] as well as conversion to [PyObject], meaning it
-/// can mostly be used in place of [PyErr] e.g. as the
-/// return type of a `pyfunction` or `pymethod`.
+/// It is constructable from both [PyErr] and [RxErr] and implements
+/// [IntoPy], so it can be returned directly from PyO3 methods and
+/// functions. Additionally, a [PyErr] can be constructed from this
+/// type, since it's just a wrapper around one.
+///
+/// # Usage
+/// When calling Rustworkx core functions from PyO3 code, use
+/// [RxPyResult] as the return type of the calling function and use
+/// the `?` operator to unwrap the result with error propagation.
+/// Since Rust automatically applies [From::from] to unwrapped error
+/// values, an [RxError] will be automatically converted to a
+/// Python-friendly error and stored in [RxPyErr]. The standard
+/// [PyErr] type will be converted to [RxPyErr] using the same
+/// mechanism, allowing Rustworkx core and PyO3 API usage to be
+/// intermixed within the same calling function.
 pub struct RxPyErr {
     pyerr: PyErr,
 }
@@ -109,8 +118,8 @@ impl From<RxError<PyErr>> for RxPyErr {
     fn from(value: RxError<PyErr>) -> Self {
         RxPyErr {
             pyerr: match value {
-                RxError::InvalidArgument(e) => PyValueError::new_err(e),
                 RxError::CallbackFailure { error } => error,
+                _ => PyValueError::new_err(value.to_string())
             },
         }
     }

@@ -10,20 +10,39 @@
 // License for the specific language governing permissions and limitations
 // under the License.
 
-//! This module defines traits that extend PetGraph's graph
-//! data structures with helpful instance methods.
+//! This module defines graph traits for node contraction.
 
-use crate::utils::merge_duplicates;
-use crate::{NodeRemovable, RxError};
+use crate::dictmap::{DictMap, InitWithHasher};
+use crate::graph::NodeRemovable;
+use crate::RxError;
+use indexmap::map::Entry::{Occupied, Vacant};
 use indexmap::IndexSet;
 use petgraph::data::Build;
-pub use petgraph::visit::{
-    Data, Dfs, EdgeRef, GraphBase, GraphProp, IntoEdges, IntoEdgesDirected, IntoNeighbors,
-    Visitable,
+use petgraph::visit::{
+    Data, Dfs, EdgeRef, GraphBase, GraphProp, IntoEdges, IntoEdgesDirected, Visitable,
 };
 use petgraph::{Directed, Direction, Undirected};
 use std::hash::Hash;
 use std::ops::Deref;
+
+fn merge_duplicates<K, V, F, E>(xs: Vec<(K, V)>, mut merge_fn: F) -> Result<Vec<(K, V)>, E>
+where
+    K: Hash + Eq,
+    F: FnMut(&V, &V) -> Result<V, E>,
+{
+    let mut kvs = DictMap::with_capacity(xs.len());
+    for (k, v) in xs {
+        match kvs.entry(k) {
+            Occupied(entry) => {
+                *entry.into_mut() = merge_fn(&v, entry.get())?;
+            }
+            Vacant(entry) => {
+                entry.insert(v);
+            }
+        }
+    }
+    Ok(kvs.into_iter().collect::<Vec<_>>())
+}
 
 pub trait ContractNodesDirected: Data {
     /// Substitute a set of nodes with a single new node.
@@ -110,9 +129,7 @@ where
             IndexSet::from_iter(nodes);
 
         if check_cycle && !can_contract(&indices_to_remove) {
-            return Err(RxError::InvalidArgument(format!(
-                "contraction would create cycle(s)"
-            )));
+            return Err(RxError::DAGWouldCycle);
         }
 
         // Create new node.

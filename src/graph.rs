@@ -21,7 +21,7 @@ use std::str;
 
 use hashbrown::{HashMap, HashSet};
 use rustworkx_core::dictmap::*;
-use rustworkx_core::graph_ext::*;
+use rustworkx_core::graph::ContractNodesUndirected;
 
 use pyo3::exceptions::PyIndexError;
 use pyo3::gc::PyVisit;
