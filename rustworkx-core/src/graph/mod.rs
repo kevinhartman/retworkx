@@ -26,8 +26,8 @@ pub use contraction::{ContractNodesDirected, ContractNodesUndirected};
 
 /// A graph whose nodes may be removed.
 pub trait NodeRemovable: Data {
-    type ReturnType;
-    fn remove_node(&mut self, node: Self::NodeId) -> Self::ReturnType;
+    type RemoveResult;
+    fn remove_node(&mut self, node: Self::NodeId) -> Self::RemoveResult;
 }
 
 impl<N, E, Ty, Ix> NodeRemovable for StableGraph<N, E, Ty, Ix>
@@ -35,7 +35,7 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    type ReturnType = Option<Self::NodeWeight>;
+    type RemoveResult = Option<Self::NodeWeight>;
     fn remove_node(&mut self, node: Self::NodeId) -> Option<Self::NodeWeight> {
         self.remove_node(node)
     }
@@ -46,7 +46,7 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    type ReturnType = Option<Self::NodeWeight>;
+    type RemoveResult = Option<Self::NodeWeight>;
     fn remove_node(&mut self, node: Self::NodeId) -> Option<Self::NodeWeight> {
         self.remove_node(node)
     }
@@ -57,8 +57,8 @@ where
     N: NodeTrait,
     Ty: EdgeType,
 {
-    type ReturnType = bool;
-    fn remove_node(&mut self, node: Self::NodeId) -> Self::ReturnType {
+    type RemoveResult = bool;
+    fn remove_node(&mut self, node: Self::NodeId) -> Self::RemoveResult {
         self.remove_node(node)
     }
 }
@@ -66,9 +66,9 @@ where
 impl<N, E, Ty: EdgeType, Null: Nullable<Wrapped = E>, Ix: IndexType> NodeRemovable
     for MatrixGraph<N, E, Ty, Null, Ix>
 {
-    type ReturnType = Self::NodeWeight;
+    type RemoveResult = Self::NodeWeight;
 
-    fn remove_node(&mut self, node: Self::NodeId) -> Self::ReturnType {
+    fn remove_node(&mut self, node: Self::NodeId) -> Self::RemoveResult {
         self.remove_node(node)
     }
 }
