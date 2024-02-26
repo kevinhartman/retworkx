@@ -88,7 +88,7 @@ use std::convert::TryFrom;
 use std::fmt::Debug;
 
 use rustworkx_core::dictmap::*;
-use rustworkx_core::graph::ErrorEnum;
+use rustworkx_core::RxError;
 
 /// An ergonomic error type used to map Rustworkx's core [RxErr] to
 /// [PyErr] automatically, via [From::from].
@@ -115,11 +115,11 @@ pub struct RxPyErr {
 /// Type alias for a [Result] with error type [RxPyErr].
 type RxPyResult<T> = Result<T, RxPyErr>;
 
-impl<N: Debug, E: Debug> From<ErrorEnum<N, E, PyErr>> for RxPyErr {
-    fn from(value: ErrorEnum<N, E, PyErr>) -> Self {
+impl<N: Debug, E: Debug> From<RxError<N, E, PyErr>> for RxPyErr {
+    fn from(value: RxError<N, E, PyErr>) -> Self {
         RxPyErr {
             pyerr: match value {
-                ErrorEnum::Callback(error) => error,
+                RxError::Callback(error) => error,
                 _ => PyValueError::new_err(format!("{:?}", value)),
             },
         }

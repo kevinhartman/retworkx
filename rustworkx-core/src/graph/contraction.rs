@@ -13,7 +13,7 @@
 //! This module defines graph traits for node contraction.
 
 use crate::dictmap::{DictMap, InitWithHasher};
-use crate::graph::{ErrorEnum, GraphError, NodeRemovable};
+use crate::graph::{GraphError, NodeRemovable};
 use indexmap::map::Entry::{Occupied, Vacant};
 use indexmap::IndexSet;
 use petgraph::data::Build;
@@ -95,10 +95,7 @@ where
     ) -> Result<Self::NodeId, Self::Error<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(
-            &Self::EdgeWeight,
-            &Self::EdgeWeight,
-        ) -> Result<Self::EdgeWeight, ErrorEnum<Self::NodeId, Self::EdgeId, E>>,
+        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, Self::Error<E>>,
     {
         let can_contract = |nodes: &IndexSet<G::NodeId, ahash::RandomState>| {
             // Start with successors of `nodes` that aren't in `nodes` itself.

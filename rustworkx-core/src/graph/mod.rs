@@ -13,56 +13,36 @@
 //! This module defines traits that extend PetGraph's graph
 //! data structures.
 
+use crate::err::RxError;
 use petgraph::graph::IndexType;
 use petgraph::graphmap::{GraphMap, NodeTrait};
 use petgraph::matrix_graph::{MatrixGraph, Nullable};
 use petgraph::stable_graph::StableGraph;
 use petgraph::visit::{Data, GraphBase};
 use petgraph::{EdgeType, Graph};
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
 
 pub mod contraction;
 
 pub use contraction::{ContractNodesDirected, ContractNodesUndirected};
 
+/// Provides an error type that can be used to bake in
+/// graph-specific typed field data.
+///
+/// For example, this is implemented for all structs which
+/// are [GraphBase] to use [RxError] with the proper `NodeId`
+/// and `EdgeId` types.
 pub trait GraphError {
     type Error<E>;
 }
 
-#[derive(Debug)]
-pub enum ErrorEnum<N, E, C> {
-    NodeId(N),
-    EdgeId(E),
-    Callback(C),
-    DAGWouldCycle,
-}
-
+// Blanket implementation which makes `Error` an `RxError` for
+// all types which are `GraphBase`.
 impl<G> GraphError for G
 where
     G: GraphBase,
 {
-    type Error<E> = ErrorEnum<G::NodeId, G::EdgeId, E>;
+    type Error<E> = RxError<G::NodeId, G::EdgeId, E>;
 }
-
-impl<N, E, C> From<C> for ErrorEnum<N, E, C> {
-    fn from(value: C) -> Self {
-        ErrorEnum::Callback(value)
-    }
-}
-
-impl<N: Debug, E: Debug, C: Debug> Display for ErrorEnum<N, E, C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            ErrorEnum::NodeId(ref n) => write!(f, "Node index not found in graph: {:?}", n),
-            ErrorEnum::EdgeId(ref n) => write!(f, "Node edge not found in graph: {:?}", n),
-            ErrorEnum::Callback(ref error) => write!(f, "Callback error: {:?}", error),
-            ErrorEnum::DAGWouldCycle => write!(f, "The operation would introduce a cycle."),
-        }
-    }
-}
-
-impl<N: Debug, E: Debug, C: Debug> Error for ErrorEnum<N, E, C> {}
 
 /// A graph whose nodes may be removed.
 pub trait NodeRemovable: Data {

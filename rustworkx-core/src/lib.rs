@@ -69,6 +69,7 @@ use std::convert::Infallible;
 /// to use needs a callback that returns [`Result`] but in your case no
 /// error can happen.
 pub type Result<T, E = Infallible> = core::result::Result<T, E>;
+pub mod err;
 
 pub mod bipartite_coloring;
 /// Module for centrality algorithms.
@@ -95,4 +96,5 @@ pub mod utils;
 
 // re-export petgraph so there is a consistent version available to users and
 // then only need to require rustworkx-core in their dependencies
+pub use err::RxError;
 pub use petgraph;
