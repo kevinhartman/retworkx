@@ -68,8 +68,8 @@ use hashbrown::HashMap;
 use numpy::Complex64;
 
 use pyo3::create_exception;
-use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyException, PyIndexError};
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
@@ -119,8 +119,10 @@ impl<N: Debug, E: Debug> From<RxError<N, E, PyErr>> for RxPyErr {
     fn from(value: RxError<N, E, PyErr>) -> Self {
         RxPyErr {
             pyerr: match value {
+                RxError::NodeId(_) => PyIndexError::new_err(format!("{:?}", value)),
+                RxError::EdgeId(_) => PyIndexError::new_err(format!("{:?}", value)),
                 RxError::Callback(error) => error,
-                _ => PyValueError::new_err(format!("{:?}", value)),
+                RxError::DAGWouldCycle => PyValueError::new_err(format!("{:?}", value)),
             },
         }
     }
