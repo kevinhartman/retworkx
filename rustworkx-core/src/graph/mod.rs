@@ -17,12 +17,52 @@ use petgraph::graph::IndexType;
 use petgraph::graphmap::{GraphMap, NodeTrait};
 use petgraph::matrix_graph::{MatrixGraph, Nullable};
 use petgraph::stable_graph::StableGraph;
-use petgraph::visit::Data;
+use petgraph::visit::{Data, GraphBase};
 use petgraph::{EdgeType, Graph};
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 
 pub mod contraction;
 
 pub use contraction::{ContractNodesDirected, ContractNodesUndirected};
+
+pub trait GraphError {
+    type Error<E>;
+}
+
+#[derive(Debug)]
+pub enum ErrorEnum<N, E, C> {
+    NodeId(N),
+    EdgeId(E),
+    Callback(C),
+    DAGWouldCycle,
+}
+
+impl<G> GraphError for G
+where
+    G: GraphBase,
+{
+    type Error<E> = ErrorEnum<G::NodeId, G::EdgeId, E>;
+}
+
+impl<N, E, C> From<C> for ErrorEnum<N, E, C> {
+    fn from(value: C) -> Self {
+        ErrorEnum::Callback(value)
+    }
+}
+
+impl<N: Debug, E: Debug, C: Debug> Display for ErrorEnum<N, E, C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            ErrorEnum::NodeId(ref n) => write!(f, "Node index not found in graph: {:?}", n),
+            ErrorEnum::EdgeId(ref n) => write!(f, "Node edge not found in graph: {:?}", n),
+            ErrorEnum::Callback(ref error) => write!(f, "Callback error: {:?}", error),
+            ErrorEnum::DAGWouldCycle => write!(f, "The operation would introduce a cycle."),
+        }
+    }
+}
+
+impl<N: Debug, E: Debug, C: Debug> Error for ErrorEnum<N, E, C> {}
 
 /// A graph whose nodes may be removed.
 pub trait NodeRemovable: Data {
@@ -67,7 +107,6 @@ impl<N, E, Ty: EdgeType, Null: Nullable<Wrapped = E>, Ix: IndexType> NodeRemovab
     for MatrixGraph<N, E, Ty, Null, Ix>
 {
     type RemoveResult = Self::NodeWeight;
-
     fn remove_node(&mut self, node: Self::NodeId) -> Self::RemoveResult {
         self.remove_node(node)
     }

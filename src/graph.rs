@@ -1818,7 +1818,8 @@ impl PyGraph {
         obj: PyObject,
         weight_combo_fn: Option<PyObject>,
     ) -> RxPyResult<usize> {
-        let merge_fn = weight_combo_fn.map(|f| move |w1: &Py<_>, w2: &Py<_>| f.call1(py, (w1, w2)));
+        let merge_fn =
+            weight_combo_fn.map(|f| move |w1: &Py<_>, w2: &Py<_>| Ok(f.call1(py, (w1, w2))?));
         let res = self.graph.contract_nodes(
             nodes.into_iter().map(|i| NodeIndex::new(i)),
             obj,

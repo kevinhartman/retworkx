@@ -13,8 +13,7 @@
 //! This module defines graph traits for node contraction.
 
 use crate::dictmap::{DictMap, InitWithHasher};
-use crate::graph::NodeRemovable;
-use crate::RxError;
+use crate::graph::{ErrorEnum, GraphError, NodeRemovable};
 use indexmap::map::Entry::{Occupied, Vacant};
 use indexmap::IndexSet;
 use petgraph::data::Build;
@@ -44,7 +43,7 @@ where
     Ok(kvs.into_iter().collect::<Vec<_>>())
 }
 
-pub trait ContractNodesDirected: Data {
+pub trait ContractNodesDirected: Data + GraphError {
     /// Substitute a set of nodes with a single new node.
     ///
     /// The specified `nodes` are removed and replaced with a new node
@@ -73,10 +72,10 @@ pub trait ContractNodesDirected: Data {
         weight: Self::NodeWeight,
         check_cycle: bool,
         weight_combo_fn: Option<F>,
-    ) -> Result<Self::NodeId, RxError<E>>
+    ) -> Result<Self::NodeId, Self::Error<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, E>;
+        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, Self::Error<E>>;
 }
 
 impl<G> ContractNodesDirected for G
@@ -93,10 +92,13 @@ where
         obj: Self::NodeWeight,
         check_cycle: bool,
         weight_combo_fn: Option<F>,
-    ) -> Result<Self::NodeId, RxError<E>>
+    ) -> Result<Self::NodeId, Self::Error<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, E>,
+        F: FnMut(
+            &Self::EdgeWeight,
+            &Self::EdgeWeight,
+        ) -> Result<Self::EdgeWeight, ErrorEnum<Self::NodeId, Self::EdgeId, E>>,
     {
         let can_contract = |nodes: &IndexSet<G::NodeId, ahash::RandomState>| {
             // Start with successors of `nodes` that aren't in `nodes` itself.
@@ -129,7 +131,7 @@ where
             IndexSet::from_iter(nodes);
 
         if check_cycle && !can_contract(&indices_to_remove) {
-            return Err(RxError::DAGWouldCycle);
+            return Err(Self::Error::DAGWouldCycle);
         }
 
         // Create new node.
@@ -190,7 +192,7 @@ where
     }
 }
 
-pub trait ContractNodesUndirected: Data {
+pub trait ContractNodesUndirected: Data + GraphError {
     /// Substitute a set of nodes with a single new node.
     ///
     /// The specified `nodes` are removed and replaced with a new node
@@ -215,10 +217,10 @@ pub trait ContractNodesUndirected: Data {
         nodes: I,
         weight: Self::NodeWeight,
         weight_combo_fn: Option<F>,
-    ) -> Result<Self::NodeId, RxError<E>>
+    ) -> Result<Self::NodeId, Self::Error<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, E>;
+        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, Self::Error<E>>;
 }
 
 impl<G> ContractNodesUndirected for G
@@ -234,10 +236,10 @@ where
         nodes: I,
         obj: Self::NodeWeight,
         weight_combo_fn: Option<F>,
-    ) -> Result<Self::NodeId, RxError<E>>
+    ) -> Result<Self::NodeId, Self::Error<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, E>,
+        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, Self::Error<E>>,
     {
         let mut indices_to_remove: IndexSet<G::NodeId, ahash::RandomState> =
             IndexSet::from_iter(nodes);

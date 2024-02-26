@@ -88,7 +88,6 @@ pub mod traversal;
 // These modules define additional data structures
 pub mod dictmap;
 pub mod distancemap;
-pub mod err;
 mod min_scored;
 /// Module for swapping tokens
 pub mod token_swapper;
@@ -96,5 +95,4 @@ pub mod utils;
 
 // re-export petgraph so there is a consistent version available to users and
 // then only need to require rustworkx-core in their dependencies
-pub use err::RxError;
 pub use petgraph;
