@@ -37,6 +37,10 @@ pub trait GraphError {
 
 // Blanket implementation which makes `Error` an `RxError` for
 // all types which are `GraphBase`.
+// This tells other `GraphError` traits in this module implemented for
+// `GraphBase` types that `Self::Error<T>` is always an `RxError` with
+// the proper NodeId and EdgeId types for the graph, which is
+// necessary to access `RxError`'s enum members.
 impl<G> GraphError for G
 where
     G: GraphBase,

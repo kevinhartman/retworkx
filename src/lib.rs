@@ -96,7 +96,8 @@ use rustworkx_core::RxError;
 /// It is constructable from both [PyErr] and [RxErr] and implements
 /// [IntoPy], so it can be returned directly from PyO3 methods and
 /// functions. Additionally, a [PyErr] can be constructed from this
-/// type, since it's just a wrapper around one.
+/// type, since it's just a wrapper around one, so you can even go
+/// from [RxErr] => [RxPyErr] => [PyErr].
 ///
 /// # Usage
 /// When calling Rustworkx core functions from PyO3 code, use
