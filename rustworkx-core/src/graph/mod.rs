@@ -22,8 +22,10 @@ use petgraph::visit::{Data, GraphBase};
 use petgraph::{EdgeType, Graph};
 
 pub mod contraction;
+pub mod multigraph;
 
 pub use contraction::{ContractNodesDirected, ContractNodesUndirected};
+pub use multigraph::{HasParallelEdgesDirected, HasParallelEdgesUndirected};
 
 /// Provides an error type that can be used to bake in
 /// graph-specific typed field data.

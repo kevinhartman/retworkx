@@ -21,7 +21,7 @@ use std::str;
 
 use hashbrown::{HashMap, HashSet};
 use rustworkx_core::dictmap::*;
-use rustworkx_core::graph::ContractNodesUndirected;
+use rustworkx_core::graph::{ContractNodesUndirected, HasParallelEdgesUndirected};
 
 use pyo3::exceptions::PyIndexError;
 use pyo3::gc::PyVisit;
@@ -360,18 +360,7 @@ impl PyGraph {
         if !self.multigraph {
             return false;
         }
-        let mut edges: HashSet<[NodeIndex; 2]> =
-            HashSet::with_capacity(2 * self.graph.edge_count());
-        for edge in self.graph.edge_references() {
-            let endpoints = [edge.source(), edge.target()];
-            let endpoints_rev = [edge.target(), edge.source()];
-            if edges.contains(&endpoints) || edges.contains(&endpoints_rev) {
-                return true;
-            }
-            edges.insert(endpoints);
-            edges.insert(endpoints_rev);
-        }
-        false
+        self.graph.has_parallel_edges()
     }
 
     /// Clears all nodes and edges
