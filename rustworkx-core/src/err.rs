@@ -17,7 +17,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 /// The common error type.
 #[derive(Debug)]
-pub enum RxError<N, E, C> {
+pub enum RxError<N, E, C = ()> {
     NodeId(N),
     EdgeId(E),
     Callback(C),
