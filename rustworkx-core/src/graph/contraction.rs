@@ -72,10 +72,13 @@ pub trait ContractNodesDirected: Data + GraphError {
         weight: Self::NodeWeight,
         check_cycle: bool,
         weight_combo_fn: Option<F>,
-    ) -> Result<Self::NodeId, Self::Error<E>>
+    ) -> Result<Self::NodeId, Self::RxError<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, Self::Error<E>>;
+        F: FnMut(
+            &Self::EdgeWeight,
+            &Self::EdgeWeight,
+        ) -> Result<Self::EdgeWeight, Self::RxError<E>>;
 }
 
 impl<G> ContractNodesDirected for G
@@ -92,10 +95,13 @@ where
         obj: Self::NodeWeight,
         check_cycle: bool,
         weight_combo_fn: Option<F>,
-    ) -> Result<Self::NodeId, Self::Error<E>>
+    ) -> Result<Self::NodeId, Self::RxError<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, Self::Error<E>>,
+        F: FnMut(
+            &Self::EdgeWeight,
+            &Self::EdgeWeight,
+        ) -> Result<Self::EdgeWeight, Self::RxError<E>>,
     {
         let can_contract = |nodes: &IndexSet<G::NodeId, ahash::RandomState>| {
             // Start with successors of `nodes` that aren't in `nodes` itself.
@@ -128,7 +134,7 @@ where
             IndexSet::from_iter(nodes);
 
         if check_cycle && !can_contract(&indices_to_remove) {
-            return Err(Self::Error::DAGWouldCycle);
+            return Err(Self::RxError::DAGWouldCycle);
         }
 
         // Create new node.
@@ -214,10 +220,13 @@ pub trait ContractNodesUndirected: Data + GraphError {
         nodes: I,
         weight: Self::NodeWeight,
         weight_combo_fn: Option<F>,
-    ) -> Result<Self::NodeId, Self::Error<E>>
+    ) -> Result<Self::NodeId, Self::RxError<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, Self::Error<E>>;
+        F: FnMut(
+            &Self::EdgeWeight,
+            &Self::EdgeWeight,
+        ) -> Result<Self::EdgeWeight, Self::RxError<E>>;
 }
 
 impl<G> ContractNodesUndirected for G
@@ -233,10 +242,13 @@ where
         nodes: I,
         obj: Self::NodeWeight,
         weight_combo_fn: Option<F>,
-    ) -> Result<Self::NodeId, Self::Error<E>>
+    ) -> Result<Self::NodeId, Self::RxError<E>>
     where
         I: IntoIterator<Item = Self::NodeId>,
-        F: FnMut(&Self::EdgeWeight, &Self::EdgeWeight) -> Result<Self::EdgeWeight, Self::Error<E>>,
+        F: FnMut(
+            &Self::EdgeWeight,
+            &Self::EdgeWeight,
+        ) -> Result<Self::EdgeWeight, Self::RxError<E>>,
     {
         let mut indices_to_remove: IndexSet<G::NodeId, ahash::RandomState> =
             IndexSet::from_iter(nodes);

@@ -34,20 +34,17 @@ pub use multigraph::{HasParallelEdgesDirected, HasParallelEdgesUndirected};
 /// are [GraphBase] to use [RxError] with the proper `NodeId`
 /// and `EdgeId` types.
 pub trait GraphError {
-    type Error<E>;
+    type RxError<E>;
 }
 
-// Blanket implementation which makes `Error` an `RxError` for
-// all types which are `GraphBase`.
-// This tells other `GraphError` traits in this module implemented for
-// `GraphBase` types that `Self::Error<T>` is always an `RxError` with
-// the proper NodeId and EdgeId types for the graph, which is
-// necessary to access `RxError`'s enum members.
+// Blanket implementation which curries the `NodeId` and `EdgeId`
+// types into an `RxError` for all types which are `GraphBase` via
+// aliasing.
 impl<G> GraphError for G
 where
     G: GraphBase,
 {
-    type Error<E> = RxError<G::NodeId, G::EdgeId, E>;
+    type RxError<E> = RxError<G::NodeId, G::EdgeId, E>;
 }
 
 /// A graph whose nodes may be removed.
