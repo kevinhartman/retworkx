@@ -12,6 +12,7 @@
 
 //! This module defines graph traits for node contraction.
 
+use std::cmp::Reverse;
 use crate::dictmap::{DictMap, InitWithHasher};
 use crate::err::{ContractError, ContractSimpleError};
 use crate::graph::NodeRemovable;
@@ -19,11 +20,14 @@ use indexmap::map::Entry::{Occupied, Vacant};
 use indexmap::IndexSet;
 use petgraph::data::Build;
 use petgraph::visit::{Data, Dfs, EdgeRef, GraphBase, GraphProp, IntoEdgesDirected, Visitable};
-use petgraph::{Directed, Direction, Undirected};
+use petgraph::{Directed, Direction, graph, Undirected};
 use std::convert::Infallible;
 use std::error::Error;
 use std::hash::Hash;
 use std::ops::Deref;
+use petgraph::graphmap;
+use petgraph::matrix_graph;
+use petgraph::stable_graph;
 
 /// A trait to provide merge functions with an associated
 /// [Error] type, automatically.
@@ -106,6 +110,35 @@ pub trait ContractNodesDirected: Data {
         I: IntoIterator<Item = Self::NodeId>;
 }
 
+// impl<G> ContractNodesDirected for G
+//     where
+//         G: GraphProp<EdgeType = Directed> + NodeRemovable + Build + Visitable,
+//         for<'b> &'b G:
+//         GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
+//         G::NodeId: Ord + Hash,
+//         G::EdgeWeight: Clone,
+// {
+//     type Error = ContractError;
+//
+//     fn contract_nodes<I>(
+//         &mut self,
+//         nodes: I,
+//         obj: Self::NodeWeight,
+//         check_cycle: bool,
+//     ) -> Result<Self::NodeId, Self::Error>
+//         where
+//             I: IntoIterator<Item = Self::NodeId>,
+//     {
+//         let indices_to_remove: IndexSet<G::NodeId, ahash::RandomState> = IndexSet::from_iter(nodes);
+//
+//         if check_cycle && !can_contract(self.deref(), &indices_to_remove) {
+//             return Err(ContractError::DAGWouldCycle);
+//         }
+//
+//         Ok(add_edges(self, indices_to_remove, obj, NoCallback::None).unwrap())
+//     }
+// }
+
 pub trait ContractNodesSimpleDirected: Data {
     /// The error type returned by contraction.
     type Error<E: Error>;
@@ -170,70 +203,39 @@ pub trait ContractNodesSimpleDirected: Data {
         F: MergeFn<Self::EdgeWeight>;
 }
 
-impl<G> ContractNodesDirected for G
-where
-    G: GraphProp<EdgeType = Directed> + NodeRemovable + Build + Visitable,
-    for<'b> &'b G:
-        GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
-    G::NodeId: Eq + Hash,
-    G::EdgeWeight: Clone,
-{
-    type Error = ContractError;
-
-    fn contract_nodes<I>(
-        &mut self,
-        nodes: I,
-        obj: Self::NodeWeight,
-        check_cycle: bool,
-    ) -> Result<Self::NodeId, Self::Error>
-    where
-        I: IntoIterator<Item = Self::NodeId>,
-    {
-        let indices_to_remove: IndexSet<G::NodeId, ahash::RandomState> = IndexSet::from_iter(nodes);
-
-        if check_cycle && !can_contract(self.deref(), &indices_to_remove) {
-            return Err(ContractError::DAGWouldCycle);
-        }
-
-        Ok(contract(self, indices_to_remove, obj, NoCallback::None).unwrap())
-    }
-}
-
-impl<G> ContractNodesSimpleDirected for G
-where
-    G: GraphProp<EdgeType = Directed> + NodeRemovable + Build + Visitable,
-    for<'b> &'b G:
-        GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
-    G::NodeId: Eq + Hash,
-    G::EdgeWeight: Clone,
-{
-    type Error<E: Error> = ContractSimpleError<E>;
-
-    fn contract_nodes_simple<I, F>(
-        &mut self,
-        nodes: I,
-        obj: Self::NodeWeight,
-        check_cycle: bool,
-        weight_combo_fn: F,
-    ) -> Result<Self::NodeId, Self::Error<F::Error>>
-    where
-        I: IntoIterator<Item = Self::NodeId>,
-        F: MergeFn<Self::EdgeWeight>,
-    {
-        let indices_to_remove: IndexSet<G::NodeId, ahash::RandomState> = IndexSet::from_iter(nodes);
-
-        if check_cycle && !can_contract(self.deref(), &indices_to_remove) {
-            return Err(ContractSimpleError::DAGWouldCycle);
-        }
-
-        contract(self, indices_to_remove, obj, Some(weight_combo_fn))
-            .map_err(ContractSimpleError::MergeError)
-    }
-}
+// impl<G> ContractNodesSimpleDirected for G
+// where
+//     G: GraphProp<EdgeType = Directed> + NodeRemovable + Build + Visitable,
+//     for<'b> &'b G:
+//         GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
+//     G::NodeId: Ord + Hash,
+//     G::EdgeWeight: Clone,
+// {
+//     type Error<E: Error> = ContractSimpleError<E>;
+//
+//     fn contract_nodes_simple<I, F>(
+//         &mut self,
+//         nodes: I,
+//         obj: Self::NodeWeight,
+//         check_cycle: bool,
+//         weight_combo_fn: F,
+//     ) -> Result<Self::NodeId, Self::Error<F::Error>>
+//     where
+//         I: IntoIterator<Item = Self::NodeId>,
+//         F: MergeFn<Self::EdgeWeight>,
+//     {
+//         let indices_to_remove: IndexSet<G::NodeId, ahash::RandomState> = IndexSet::from_iter(nodes);
+//
+//         if check_cycle && !can_contract(self.deref(), &indices_to_remove) {
+//             return Err(ContractSimpleError::DAGWouldCycle);
+//         }
+//
+//         add_edges(self, indices_to_remove, obj, Some(weight_combo_fn))
+//             .map_err(ContractSimpleError::MergeError)
+//     }
+// }
 
 pub trait ContractNodesUndirected: Data {
-    type Error;
-
     /// Substitute a set of nodes with a single new node.
     ///
     /// The specified `nodes` are removed and replaced with a new node
@@ -286,13 +288,85 @@ pub trait ContractNodesUndirected: Data {
         &mut self,
         nodes: I,
         weight: Self::NodeWeight,
-    ) -> Result<Self::NodeId, Self::Error>
+    ) -> Self::NodeId
     where
         I: IntoIterator<Item = Self::NodeId>;
 }
 
-pub trait ContractNodesSimpleUndirected: Data {
-    type Error<E: Error>;
+impl<N, E, Ix> ContractNodesUndirected for graph::Graph<N, E, Undirected, Ix>
+    where
+        Ix: graph::IndexType,
+        N: Ord + Hash,
+        E: Clone,
+{
+    fn contract_nodes<I>(
+        &mut self,
+        nodes: I,
+        obj: Self::NodeWeight,
+    ) -> Self::NodeId
+        where
+            I: IntoIterator<Item = Self::NodeId>,
+    {
+        contract_unstable(self, nodes, obj, NoCallback::None).unwrap()
+    }
+}
+
+impl<N, E, Ix> ContractNodesUndirected for stable_graph::StableGraph<N, E, Undirected, Ix>
+    where
+        Ix: stable_graph::IndexType,
+        N: Ord + Hash,
+        E: Clone,
+{
+    fn contract_nodes<I>(
+        &mut self,
+        nodes: I,
+        obj: Self::NodeWeight,
+    ) -> Self::NodeId
+        where
+            I: IntoIterator<Item = Self::NodeId>,
+    {
+        contract_stable(self, nodes, obj, NoCallback::None).unwrap()
+    }
+}
+
+impl<N, E> ContractNodesUndirected for graphmap::GraphMap<N, E, Undirected>
+    where
+        N: Copy + Ord + Hash,
+        E: Clone,
+{
+    fn contract_nodes<I>(
+        &mut self,
+        nodes: I,
+        obj: Self::NodeWeight,
+    ) -> Self::NodeId
+        where
+            I: IntoIterator<Item = Self::NodeId>,
+    {
+        contract_stable(self, nodes, obj, NoCallback::None).unwrap()
+    }
+}
+
+impl<N, E, Null, Ix> ContractNodesUndirected for matrix_graph::MatrixGraph<N, E, Undirected, Null, Ix>
+    where
+        N: Ord + Hash,
+        E: Clone,
+        Null: matrix_graph::Nullable<Wrapped = E>,
+        Ix: matrix_graph::IndexType,
+{
+    fn contract_nodes<I>(
+        &mut self,
+        nodes: I,
+        obj: Self::NodeWeight,
+    ) -> Self::NodeId
+        where
+            I: IntoIterator<Item = Self::NodeId>,
+    {
+        contract_unstable(self, nodes, obj, NoCallback::None).unwrap()
+    }
+}
+
+pub trait ContractNodesSimpleUndirected<N, E, Ix> {
+    type Result<Ex: Error>;
 
     /// Substitute a set of nodes with a single new node.
     ///
@@ -342,60 +416,126 @@ pub trait ContractNodesSimpleUndirected: Data {
     fn contract_nodes_simple<I, F>(
         &mut self,
         nodes: I,
-        weight: Self::NodeWeight,
+        weight: N,
         weight_combo_fn: F,
-    ) -> Result<Self::NodeId, Self::Error<F::Error>>
-    where
-        I: IntoIterator<Item = Self::NodeId>,
-        F: MergeFn<Self::EdgeWeight>;
+    ) -> Result<Ix, Self::Error<F::Error>>
+        where
+            I: IntoIterator<Item = Ix>,
+            F: MergeFn<E>;
 }
 
-impl<G> ContractNodesUndirected for G
-where
-    G: GraphProp<EdgeType = Undirected> + NodeRemovable + Build + Visitable,
-    for<'b> &'b G:
-        GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
-    G::NodeId: Eq + Hash,
-    G::EdgeWeight: Clone,
-{
-    type Error = ContractError;
-
-    fn contract_nodes<I>(
-        &mut self,
-        nodes: I,
-        obj: Self::NodeWeight,
-    ) -> Result<Self::NodeId, Self::Error>
+impl<N, E, Ix> ContractNodesSimpleUndirected<N, E, Ix> for graph::Graph<N, E, Undirected, Ix>
     where
-        I: IntoIterator<Item = Self::NodeId>,
-    {
-        Ok(contract(self, IndexSet::from_iter(nodes), obj, NoCallback::None).unwrap())
-    }
-}
-
-impl<G> ContractNodesSimpleUndirected for G
-where
-    G: GraphProp<EdgeType = Undirected> + NodeRemovable + Build + Visitable,
-    for<'b> &'b G:
-        GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
-    G::NodeId: Eq + Hash,
-    G::EdgeWeight: Clone,
+        Ix: graph::IndexType,
+        N: Ord + Hash,
+        E: Clone,
 {
-    type Error<E: Error> = ContractSimpleError<E>;
+    type Result<Ex: Error> = Result<graph::NodeIndex<Ix>, ContractSimpleError<Ex>>;
 
     fn contract_nodes_simple<I, F>(
         &mut self,
         nodes: I,
-        obj: Self::NodeWeight,
+        weight: N,
         weight_combo_fn: F,
-    ) -> Result<Self::NodeId, Self::Error<F::Error>>
-    where
-        I: IntoIterator<Item = Self::NodeId>,
-        F: MergeFn<Self::EdgeWeight>,
+    ) -> Self::Result<F::Error>
+        where
+            I: IntoIterator<Item = graph::NodeIndex<Ix>>,
+            F: MergeFn<E>,
     {
-        contract(self, IndexSet::from_iter(nodes), obj, Some(weight_combo_fn))
-            .map_err(ContractSimpleError::MergeError)
+        contract_unstable(self, nodes, weight, Some(weight_combo_fn)).map_err(ContractSimpleError::MergeError)
     }
 }
+
+impl<N, E, Ix> ContractNodesSimpleUndirected<N, E, Ix> for stable_graph::StableGraph<N, E, Undirected, Ix>
+    where
+        Ix: stable_graph::IndexType,
+        N: Ord + Hash,
+        E: Clone,
+{
+    type Result<Ex: Error> = Result<stable_graph::NodeIndex<Ix>, ContractSimpleError<Ex>>;
+
+    fn contract_nodes_simple<I, F>(
+        &mut self,
+        nodes: I,
+        weight: N,
+        weight_combo_fn: F,
+    ) -> Self::Result<F::Error>
+        where
+            I: IntoIterator<Item = Ix>,
+            F: MergeFn<E>,
+    {
+        contract_stable(self, nodes, weight, weight_combo_fn).map_err(ContractSimpleError::MergeError)
+    }
+}
+
+impl<N, E> ContractNodesSimpleUndirected<N, E, N> for graphmap::GraphMap<N, E, Undirected>
+    where
+        N: Copy + Ord + Hash,
+        E: Clone,
+{
+    type Result<Ex: Error> = Result<N, ContractSimpleError<Ex>>;
+
+    fn contract_nodes_simple<I, F>(
+        &mut self,
+        nodes: I,
+        weight: N,
+        weight_combo_fn: F,
+    ) -> Self::Result<F::Error>
+        where
+            I: IntoIterator<Item = N>,
+            F: MergeFn<E>,
+    {
+        contract_stable(self, nodes, weight, weight_combo_fn).map_err(ContractSimpleError::MergeError)
+    }
+}
+
+impl<N, E, Null, Ix> ContractNodesSimpleUndirected<N, E, Ix> for matrix_graph::MatrixGraph<N, E, Undirected, Null, Ix>
+    where
+        N: Ord + Hash,
+        E: Clone,
+        Null: matrix_graph::Nullable<Wrapped = E>,
+        Ix: matrix_graph::IndexType,
+{
+    type Result<Ex: Error> = Result<N, ContractSimpleError<Ex>>;
+
+    fn contract_nodes_simple<I, F>(
+        &mut self,
+        nodes: I,
+        weight: N,
+        weight_combo_fn: F,
+    ) -> Self::Result<F::Error>
+        where
+            I: IntoIterator<Item = Ix>,
+            F: MergeFn<E>,
+    {
+        contract_unstable(self, nodes, weight, weight_combo_fn).map_err(ContractSimpleError::MergeError)
+    }
+}
+
+// impl<G> ContractNodesSimpleUndirected for G
+// where
+//     G: GraphProp<EdgeType = Undirected> + NodeRemovable + Build + Visitable,
+//     for<'b> &'b G:
+//         GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
+//     G::NodeId: Ord + Hash,
+//     G::EdgeWeight: Clone,
+// {
+//     type Error<E: Error> = ContractSimpleError<E>;
+//
+//     fn contract_nodes_simple<I, F>(
+//         &mut self,
+//         nodes: I,
+//         obj: Self::NodeWeight,
+//         weight_combo_fn: F,
+//     ) -> Result<Self::NodeId, Self::Error<F::Error>>
+//     where
+//         I: IntoIterator<Item = Self::NodeId>,
+//         F: MergeFn<Self::EdgeWeight>,
+//     {
+//         add_edges(self, IndexSet::from_iter(nodes), obj, Some(weight_combo_fn))
+//             .map_err(ContractSimpleError::MergeError)
+//     }
+// }
 
 fn merge_duplicates<K, V, F, E>(xs: Vec<(K, V)>, mut merge_fn: F) -> Result<Vec<(K, V)>, E>
 where
@@ -415,6 +555,66 @@ where
     }
     Ok(kvs.into_iter().collect::<Vec<_>>())
 }
+
+fn contract_stable<G, I, F, E>(graph: &mut G, nodes: I, weight: G::NodeWeight, weight_combo_fn: Option<F>) -> Result<G::NodeId, E> where
+    G: GraphProp + NodeRemovable + Build + Visitable,
+    for<'b> &'b G:
+    GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
+    G::NodeId: Ord + Hash,
+    G::EdgeWeight: Clone,
+    I: IntoIterator<Item = G::NodeId>,
+    F: FnMut(&G::EdgeWeight, &G::EdgeWeight) -> Result<G::EdgeWeight, E>
+{
+    let node_index = graph.add_node(weight);
+    let mut nodes = IndexSet::from_iter(nodes);
+
+    // Sanitize new node index from user input.
+    nodes.swap_remove(&node_index);
+
+    // Connect old node edges to the replacement.
+    add_edges(graph, &node_index, &nodes, weight_combo_fn).unwrap();
+
+    // Remove nodes that have been replaced.
+    for index in nodes {
+        graph.remove_node(index);
+    }
+
+    Ok(node_index)
+}
+
+fn contract_unstable<G, I, F, E>(graph: &mut G, nodes: I, weight: G::NodeWeight, weight_combo_fn: Option<F>) -> Result<G::NodeId, E> where
+    G: GraphProp + NodeRemovable + Build + Visitable,
+    for<'b> &'b G:
+        GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
+    G::NodeId: Ord + Hash,
+    G::EdgeWeight: Clone,
+    I: IntoIterator<Item = G::NodeId>,
+    F: FnMut(&G::EdgeWeight, &G::EdgeWeight) -> Result<G::EdgeWeight, E>
+{
+    let mut node_index = graph.add_node(weight);
+    let mut nodes = IndexSet::from_iter(nodes);
+
+    // Sanitize new node index from user input.
+    nodes.swap_remove(&node_index);
+
+    // Connect old node edges to the replacement.
+    add_edges(graph, &node_index, &nodes, weight_combo_fn).unwrap();
+
+    // We need to remove indices in reverse order for unstable graphs
+    // so we don't mess up our place!
+    nodes.sort_by_cached_key(|n| Reverse(n));
+
+    // And, we need to adjust the index of the newly added node.
+    node_index -= nodes.len();
+
+    // Remove nodes that have been replaced.
+    for index in nodes {
+        graph.remove_node(index);
+    }
+
+    Ok(node_index)
+}
+
 
 fn can_contract<G>(graph: G, nodes: &IndexSet<G::NodeId, ahash::RandomState>) -> bool
 where
@@ -450,25 +650,20 @@ where
 // Helper type for specifying `NoCallback::None` at callsites of `contract`.
 type NoCallback<E> = Option<fn(&E, &E) -> Result<E, Infallible>>;
 
-fn contract<G, F, E>(
+fn add_edges<G, F, E>(
     graph: &mut G,
-    mut nodes: IndexSet<G::NodeId, ahash::RandomState>,
-    obj: G::NodeWeight,
+    new_node: &G::NodeId,
+    nodes: &IndexSet<G::NodeId, ahash::RandomState>,
     mut weight_combo_fn: Option<F>,
-) -> Result<G::NodeId, E>
+) -> Result<(), E>
 where
-    G: GraphProp + NodeRemovable + Build + Visitable,
+    G: GraphProp + Build + Visitable,
     for<'b> &'b G:
         GraphBase<NodeId = G::NodeId> + Data<EdgeWeight = G::EdgeWeight> + IntoEdgesDirected,
-    G::NodeId: Eq + Hash,
+    G::NodeId: Ord + Hash,
     G::EdgeWeight: Clone,
     F: FnMut(&G::EdgeWeight, &G::EdgeWeight) -> Result<G::EdgeWeight, E>,
 {
-    let node_index = graph.add_node(obj);
-
-    // Sanitize new node index from user input.
-    nodes.swap_remove(&node_index);
-
     // Determine and add edges for new node.
     {
         // Note: even when the graph is undirected, we used edges_directed because
@@ -491,7 +686,7 @@ where
         }
 
         for (source, weight) in incoming_edges.into_iter() {
-            graph.add_edge(source, node_index, weight);
+            graph.add_edge(source, new_node, weight);
         }
     }
 
@@ -514,14 +709,9 @@ where
         }
 
         for (target, weight) in outgoing_edges.into_iter() {
-            graph.add_edge(node_index, target, weight);
+            graph.add_edge(new_node, target, weight);
         }
     }
 
-    // Remove nodes that have been replaced.
-    for index in nodes {
-        graph.remove_node(index);
-    }
-
-    Ok(node_index)
+    Ok(())
 }
